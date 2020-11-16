@@ -1,7 +1,6 @@
 from server.models.postgis.mapping_issues import MappingIssueCategory
 from server.models.postgis.task import TaskMappingIssue
 from server.models.dtos.mapping_issues_dto import MappingIssueCategoryDTO
-import pandas as pd
 
 class MappingIssueCategoryService:
 
@@ -55,12 +54,37 @@ class MappingIssueService:
     def get_all_mapping_issues():
         """
         Get all issues from db
-        :raises: NotFound
+        raises: NotFound
         """
-        issues = TaskMappingIssue.get_all_issues();
+        
+        mappingIssueList = TaskMappingIssue.get_all_issues()
 
-        if issues is None:
+        if mappingIssueList is None:
             raise NotFound()
+        else:
+            #Sum the counts of all entries of the same category and convert to csv
+            issueCount = TaskMappingIssue.get_issue_row_count()
+            issues = []
+            summedIssue = TaskMappingIssue("Issue", "Count", "CategoryID") #csv table column names
 
-        pandasDataFrame = pd.DataFrame(data=issues)
-        return pandasDataFrame.to_csv()
+            i = 0
+            for issue in mappingIssueList:
+                if ((issue.mapping_issue_category_id != summedIssue.mapping_issue_category_id) or (i == 0)): 
+                    issues.append(summedIssue)
+                    summedIssue = issue
+                else:
+                    summedIssue.count += issue.count
+                if (i == (issueCount - 1)):
+                    issues.append(summedIssue)
+                i += 1
+
+            csvIssues = []
+            for issue in issues:
+                issueProperties = [str(issue.mapping_issue_category_id), 
+                                   str(issue.issue),
+                                   str(issue.count)]
+                csvIssue = ",".join(issueProperties)
+                csvIssues.append(csvIssue)
+                
+            csvString = "\n".join(csvIssues)
+            return csvString
