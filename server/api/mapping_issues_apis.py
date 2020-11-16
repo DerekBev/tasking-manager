@@ -236,6 +236,7 @@ class MappingIssueCategoriesAPI(Resource):
 
 
 class MappingIssuesAPI(Resource):
+
     @tm.pm_only()
     @token_auth.login_required
     def get(self):
@@ -264,7 +265,7 @@ class MappingIssuesAPI(Resource):
         """
         try:
             issuesCSV = MappingIssueService.get_all_mapping_issues()
-            return issuesCSV.toPrimitive(), 200
+            return issuesCSV, 200  #, {'Content-Type': 'text/csv'}
         except NotFound:
             return {"Error": "Mapping-issues not found"}, 404
         except Exception as e:
