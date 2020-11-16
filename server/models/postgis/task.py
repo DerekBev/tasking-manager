@@ -134,13 +134,13 @@ class TaskMappingIssue(db.Model):
         issue_dto.count = self.count
         return issue_dto
 
-    def __repr__(self):
-        return "{0}: {1}".format(self.issue, self.count)
-
     @staticmethod
     def get_all_issues():
-        issues = TaskMappingIssue.query.all()
-        return issues
+        return TaskMappingIssue.query.order_by(TaskMappingIssue.mapping_issue_category_id)
+
+    @staticmethod
+    def get_issue_row_count():
+        return TaskMappingIssue.query.count()
 
 
 class TaskHistory(db.Model):
