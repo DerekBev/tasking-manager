@@ -1,6 +1,9 @@
 from server.models.postgis.mapping_issues import MappingIssueCategory
-from server.models.postgis.task import TaskMappingIssue
+from server.models.postgis.task import TaskMappingIssue, TaskHistory, Task
+from server.models.postgis.project import Project
 from server.models.dtos.mapping_issues_dto import MappingIssueCategoryDTO
+from copy import deepcopy
+import numpy as np
 
 class MappingIssueCategoryService:
 
@@ -51,40 +54,144 @@ class MappingIssueCategoryService:
 class MappingIssueService:
 
     @staticmethod
-    def get_all_mapping_issues():
+    def get_mapping_issues(projectId: int):  #projectId: int, detailedView: boolean
         """
-        Get all issues from db
+        Returns a csv string of all mapping issues associated with the given project summed and sorted by user
         raises: NotFound
         """
+        detailedView = False  #TODO remove once detailedView is added as an argument
         
-        mappingIssueList = TaskMappingIssue.get_all_issues()
-
-        if mappingIssueList is None:
-            raise NotFound()
-        else:
-            #Sum the counts of all entries of the same category and convert to csv
-            issueCount = TaskMappingIssue.get_issue_row_count()
-            issues = []
-            summedIssue = TaskMappingIssue("Issue", "Count", "CategoryID") #csv table column names
-
-            i = 0
-            for issue in mappingIssueList:
-                if ((issue.mapping_issue_category_id != summedIssue.mapping_issue_category_id) or (i == 0)): 
-                    issues.append(summedIssue)
-                    summedIssue = issue
+        allProjectTasks = Task.get_all_tasks(projectId)
+        validatedTasks = []
+        projectUsers = []
+        for task in allProjectTasks:
+            if (task.validated_by == None):
+                continue
+            else:
+                validatedTasks.append(task)
+                if (task.mapper.username in projectUsers):
+                    continue
                 else:
-                    summedIssue.count += issue.count
-                if (i == (issueCount - 1)):
-                    issues.append(summedIssue)
-                i += 1
+                    projectUsers.append(task.mapper.username)
 
-            csvIssues = []
-            for issue in issues:
-                issueProperties = [str(issue.mapping_issue_category_id), 
-                                   str(issue.issue),
-                                   str(issue.count)]
-                csvIssue = ",".join(issueProperties)
-                csvIssues.append(csvIssue)
-                
-            csvString = "\n".join(csvIssues)
-            return csvString
+
+        userDict = {}
+        for user in projectUsers:
+            userDict[user] = {}
+
+        taskDict = {}
+        issueDict = {}
+        i = 0
+        currentUsername = None
+        for task in validatedTasks:
+            if (i == 0):
+                currentUsername = task.mapper.username
+
+            if (task.mapper.username != currentUsername):
+                userDict[currentUsername] = deepcopy(taskDict)
+                currentUsername = task.mapper.username
+                taskDict.clear()
+
+            #print(task.id, task.mapper.username)
+            issueDict.clear()
+
+            for hist in task.task_history:
+                if (len(hist.task_mapping_issues) > 0):
+                    for issue in hist.task_mapping_issues:
+                        issueDict[issue.issue] = issue.count
+
+            if (len(issueDict.keys()) > 0):
+                taskDict[task.id] = deepcopy(issueDict)
+
+            i += 1
+
+        userDict[currentUsername] = taskDict
+
+        #print("end: ", userDict)
+
+        
+        #User, taskID:validated by, issues......
+        #    ,  3 : validator     ,  #   ,  #   ,  #  ... 
+        #    ,  6 : validator     ,  #   ,  #   ,  #  ... 
+        #totals,                    ,  #   ,  #   ,  #  ...
+
+        #grand totals at the bottom
+
+
+        categories_dto = MappingIssueCategoryService.get_all_mapping_issue_categories(True)
+        categories = categories_dto.categories
+
+        categoryIndexDict = {}
+        categoryNamesDict = {}
+        maxCategoryIndex = 0
+        for category in categories:
+            #print(category.category_id, category.name, category.description, category.archived)
+            categoryIndexDict[category.name] = category.category_id
+            categoryNamesDict[category.category_id] = category.name
+            if (category.category_id > maxCategoryIndex):
+                maxCategoryIndex = category.category_id
+
+        numCategories = len(categoryIndexDict.keys())
+        numValidatedTasks = len(validatedTasks)
+        numUsers = len(projectUsers)
+
+        #print(categoryIndexDict)
+        #print(categoryNamesDict)
+
+
+        csvString = None
+        if (detailedView):
+            #print("Detailed view not yet implemented")
+            return "TODO implement detailed view"
+        else:
+            dataTable = {}
+            totals = np.zeros(maxCategoryIndex + 1, dtype='i')
+            for user in projectUsers:
+                dataTable[user] = np.zeros(maxCategoryIndex + 1, dtype='i')
+                for task in userDict[user]:
+                    for issue in userDict[user][task]:  #issue is the name of the issue
+                        #print(task, issue, userDict[user][task][issue])
+                        categoryIndex = categoryIndexDict[issue]
+                        issueCount = userDict[user][task][issue]
+                        dataTable[user][categoryIndex] += issueCount
+                        totals[categoryIndex] += issueCount
+
+            #print(dataTable)
+
+            allRows = []
+            issueNamesRow = ['Issue']
+            possibleIndices = categoryNamesDict.keys()
+            for i in range(1, maxCategoryIndex + 1):  #category id is the category's index. Category ids start at 1
+                if (i in possibleIndices):
+                    issueNamesRow.append(categoryNamesDict[i])
+                else:
+                    issueNamesRow.append("")
+
+            allRows.append(",".join(issueNamesRow))
+
+            for user in projectUsers:
+                row = []
+                row.append(user)
+                #print(dataTable[user])
+                for issueCount in dataTable[user]:
+                        row.append(str(issueCount))
+                row.pop(1)
+
+                allRows.append(",".join(row))
+
+            totalsRow = ['Total']
+            for value in totals:
+                totalsRow.append(str(value))
+            totalsRow.pop(1)
+
+            allRows.append(",".join(totalsRow))
+
+            csvString = "\n".join(allRows)
+            #print(csvString)
+
+        return csvString
+
+
+
+
+
