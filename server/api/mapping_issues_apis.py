@@ -239,7 +239,7 @@ class MappingIssuesAPI(Resource):
 
     @tm.pm_only()
     @token_auth.login_required
-    def get(self):
+    def get(self, project_id):
         """
         Gets all mapping issues and returns them as a csv string/file
         ___
@@ -264,8 +264,8 @@ class MappingIssuesAPI(Resource):
                 description: Internal server error
         """
         try:
-            issuesCSV = MappingIssueService.get_all_mapping_issues()
-            return issuesCSV, 200  #, {'Content-Type': 'text/csv'}
+            issuesCSV = MappingIssueService.get_mapping_issues(project_id)
+            return issuesCSV, 200
         except NotFound:
             return {"Error": "Mapping-issues not found"}, 404
         except Exception as e:
