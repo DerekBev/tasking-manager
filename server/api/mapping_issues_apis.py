@@ -4,7 +4,7 @@ from schematics.exceptions import DataError
 from server.models.dtos.mapping_issues_dto import MappingIssueCategoryDTO
 from server.models.postgis.utils import NotFound
 from server.services.mapping_issues_service import MappingIssueCategoryService
-from server.services.mapping_issues_service import MappingIssueService
+from server.services.mapping_issues_service import MappingIssueExporter
 from server.services.users.authentication_service import token_auth, tm
 
 
@@ -239,7 +239,7 @@ class MappingIssuesAPI(Resource):
 
     @tm.pm_only()
     @token_auth.login_required
-    def get(self, project_id):
+    def get(self, project_id, detailed_view):
         """
         Gets all mapping issues and returns them as a csv string/file
         ___
@@ -264,7 +264,7 @@ class MappingIssuesAPI(Resource):
                 description: Internal server error
         """
         try:
-            issuesCSV = MappingIssueService.get_mapping_issues(project_id)
+            issuesCSV = MappingIssueExporter.get_mapping_issues(self, project_id, detailed_view)
             return issuesCSV, 200
         except NotFound:
             return {"Error": "Mapping-issues not found"}, 404
