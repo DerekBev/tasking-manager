@@ -8,6 +8,7 @@ from server.models.dtos.stats_dto import ProjectContributionsDTO
 from server.services.stats_service import StatsService
 from copy import deepcopy
 import numpy as np
+import typing
 
 class MappingIssueCategoryService:
 
@@ -69,33 +70,26 @@ class MappingIssueExporter:
         if (zerosRows == "true"):
             zeros = True
         
-        #user_dict {str username : {int task (taskId) : {str issue : str issue_count}}}
-        #project_users is a list of users on the project with no duplicates
-        #int num_validated_tasks
-        #tasks_as_tasks_dict {int taskId : task}
         user_dict, project_users, num_validated_tasks, tasks_as_tasks_dict = MappingIssueExporter.compile_validated_tasks_by_user(project_id, zeros)
 
-        #data_table {str user : numpy array of user issue totals}
-        #category_index_dict {str issue : int issueId}
-        #category_names_dict {int issueId : str issue}
-        #max_category_index: int, max issueId
-        #totals: numpy array of project issue totals
         data_table, category_index_dict, category_names_dict, max_category_index, totals = MappingIssueExporter.build_issue_totals_table(user_dict, project_users)
 
-        #Format
+        """
+        Format
 
-        #Basic
-        #    , issue, issue, issue, ...
-        #user, count, count, count, ...
-        #totals  ...
+        Basic
+            , issue, issue, issue, ...
+        user, count, count, count, ...
+        totals  ...
 
-        #Detailed
-        #  User  , taskID:validated by, issues......
-        #        ,  id : validator    ,  count   ,  count   ,  count  ... 
-        #        ,  id : validator    ,  count   ,  count   ,  count  ... 
-        #user totals ...
+        Detailed
+          User  , taskID:validated by, issues......
+                ,  id : validator    ,  count   ,  count   ,  count  ... 
+                ,  id : validator    ,  count   ,  count   ,  count  ... 
+        user totals ...
 
-        #grand totals at the bottom
+        grand totals at the bottom
+        """
 
 
         """ Build the csv string """
@@ -104,8 +98,8 @@ class MappingIssueExporter:
         all_rows = []
         issue_names_row = []
         if (detailed):
-           issue_names_row.append('Username (tasks mapped)')
-           issue_names_row.append('taskId: ValidatedBy')
+            issue_names_row.append('Username (tasks mapped)')
+            issue_names_row.append('taskId: ValidatedBy')
         else:
             issue_names_row.append('Username (tasks mapped)')
 
@@ -176,23 +170,25 @@ class MappingIssueExporter:
         all_rows.append(','.join(totals_row))
 
         csv_string = '\n'.join(all_rows)
-        #print(csv_string)
 
         return csv_string
 
 
     @staticmethod
-    def compile_validated_tasks_by_user(project_id: int, zeros: bool):
+    def compile_validated_tasks_by_user(project_id: int, zeros: bool) -> typing.Tuple[typing.Dict[str, typing.Dict[int, typing.Dict[str, str]]], typing.List[str], int, typing.Dict[int, Task]]:
+        """
+        :returns: user_dict {str username : {int taskId : {str issue : str issue_count}}}
+        project_users: Set[str]
+        int num_validated_tasks
+        tasks_as_tasks_dict {int taskId : task}
+        """
         all_project_tasks = Task.get_all_tasks(project_id)
         validated_tasks = []
-        project_users = []
+        project_users = set()
         for task in all_project_tasks:
             if (task.task_status == TaskStatus.VALIDATED.value):
                 validated_tasks.append(task)
-                if (task.mapper.username in project_users):
-                    continue
-                else:
-                    project_users.append(task.mapper.username)
+                project_users.add(task.mapper.username)
             else:
                 continue
 
@@ -240,10 +236,16 @@ class MappingIssueExporter:
 
 
     @staticmethod
-    def build_issue_totals_table(user_dict, project_users):
-        """ Get category names and create table of issue totals: mapped users -> arrayOfMappingIssueTotals """
-        """ Mapping issue totals are sorted by mapping issue category_id """
-        """ A row of totals is included at the bottom """
+    def build_issue_totals_table(user_dict, project_users) -> typing.Tuple[typing.Dict[str, np.array], typing.Dict[str, int], typing.Dict[int, str], int, np.array]:
+        """ Get category names and create table of issue totals: users -> arrayOfMappingIssueTotals """
+        """ Includes a row of overall totals at the bottom """
+        """
+        :returns: data_table {str user : numpy array of user issue totals}
+        category_index_dict {str issue : int issueId}
+        category_names_dict {int issueId : str issue}
+        max_category_index: int
+        totals: numpy array of project issue totals
+        """
         categories_dto = MappingIssueCategoryService.get_all_mapping_issue_categories(True)
         categories = categories_dto.categories
 
