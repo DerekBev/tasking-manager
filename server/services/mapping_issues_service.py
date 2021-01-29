@@ -103,12 +103,8 @@ class MappingIssueExporter:
         else:
             issue_names_row.append('Username (tasks mapped)')
 
-        possible_indices = category_names_dict.keys()
-        for i in range(1, max_category_index + 1):  #category id is the category's index. Category ids start at 1
-            if (i in possible_indices):
-                issue_names_row.append(category_names_dict[i])
-            else:
-                issue_names_row.append('')
+        for i in range(1, max_category_index + 1):
+            issue_names_row.append(category_names_dict[i])
 
         all_rows.append(','.join(issue_names_row))
 
@@ -242,21 +238,31 @@ class MappingIssueExporter:
         """
         :returns: data_table {str user : numpy array of user issue totals}
         category_index_dict {str issue : int issueId}
-        category_names_dict {int issueId : str issue}
+        category_names_dict {int the new issueId assigned here : str issue}
         max_category_index: int
         totals: numpy array of project issue totals
         """
-        categories_dto = MappingIssueCategoryService.get_all_mapping_issue_categories(True)
+        categories_dto = MappingIssueCategoryService.get_all_mapping_issue_categories(False)
         categories = categories_dto.categories
+
+        def category_id(categories_dto):
+            return categories_dto.category_id
+
+        categories.sort(key=category_id)
 
         category_index_dict = {}
         category_names_dict = {}
         max_category_index = 0
+        i = 0
+        for category in categories:
+            i += 1
+            category.category_id = i
+        max_category_index = i
         for category in categories:
             category_index_dict[category.name] = category.category_id
             category_names_dict[category.category_id] = category.name
-            if (category.category_id > max_category_index):
-                max_category_index = category.category_id
+
+        unarchived_categories = category_index_dict.keys()
 
         data_table = {}
         totals = np.zeros(max_category_index + 1, dtype='i')
@@ -264,10 +270,11 @@ class MappingIssueExporter:
             data_table[user] = np.zeros(max_category_index + 1, dtype='i')
             for task in user_dict[user]:
                 for issue in user_dict[user][task]:  #issue is the name of the issue
-                    category_index = category_index_dict[issue]
-                    issue_count = user_dict[user][task][issue]
-                    data_table[user][category_index] += issue_count
-                    totals[category_index] += issue_count
+                    if (issue in unarchived_categories):
+                        category_index = category_index_dict[issue]
+                        issue_count = user_dict[user][task][issue]
+                        data_table[user][category_index] += issue_count
+                        totals[category_index] += issue_count
 
         return data_table, category_index_dict, category_names_dict, max_category_index, totals
 
