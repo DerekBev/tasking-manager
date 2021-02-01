@@ -104,7 +104,7 @@ class MappingIssueExporter:
             issue_names_row.append('Username (tasks mapped)')
 
         for i in range(1, max_category_index + 1):
-            issue_names_row.append(category_names_dict[i])
+            issue_names_row.append(MappingIssueExporter.format_field(category_names_dict[i]))
 
         all_rows.append(','.join(issue_names_row))
 
@@ -238,7 +238,7 @@ class MappingIssueExporter:
         """
         :returns: data_table {str user : numpy array of user issue totals}
         category_index_dict {str issue : int issueId}
-        category_names_dict {int the new issueId assigned here : str issue}
+        category_names_dict {int the new issueId assigned : str issue}
         max_category_index: int
         totals: numpy array of project issue totals
         """
@@ -278,3 +278,18 @@ class MappingIssueExporter:
 
         return data_table, category_index_dict, category_names_dict, max_category_index, totals
 
+
+    @staticmethod
+    def format_field(field):
+        if field.find(",") == -1:
+            return field
+        else:
+            newField = ["\""]
+            for char in field:
+                if (char == "\""):
+                    newField.append("\"\"")
+                else:
+                    newField.append(char)
+            newField.append("\"")
+            quotedField = "".join(newField)
+            return quotedField
