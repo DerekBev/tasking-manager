@@ -56,7 +56,7 @@ class MappingIssueCategoryService:
         return MappingIssueCategory.get_all_categories(include_archived)
 
 
-class MappingIssueExporter:
+class MappingIssueExportService:
 
     def get_mapping_issues(self, project_id: int, detailedView: str, zerosRows: str):
         """
