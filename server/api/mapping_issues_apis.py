@@ -264,7 +264,7 @@ class MappingIssuesAPI(Resource):
                 description: Internal server error
         """
         try:
-            issuesCSV = MappingIssueExportService.get_mapping_issues(self, project_id, detailed_view, zeros_rows)
+            issuesCSV = MappingIssueExportService().get_mapping_issues(project_id, detailed_view, zeros_rows)
             return issuesCSV, 200
         except NotFound:
             return {"Error": "Mapping-issues not found"}, 404

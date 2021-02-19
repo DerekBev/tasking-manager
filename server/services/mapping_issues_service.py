@@ -57,6 +57,11 @@ class MappingIssueCategoryService:
 
 
 class MappingIssueExportService:
+    #fields for testing
+    category_names_dict = {}
+    totals = None
+    single_task_rows = {}
+    user_issue_totals = {}
 
     def get_mapping_issues(self, project_id: int, detailedView: str, zerosRows: str):
         """
@@ -70,9 +75,12 @@ class MappingIssueExportService:
         if (zerosRows == "true"):
             zeros = True
         
-        user_dict, project_users, num_validated_tasks, tasks_as_tasks_dict = MappingIssueExporter.compile_validated_tasks_by_user(project_id, zeros)
+        user_dict, project_users, num_validated_tasks, tasks_as_tasks_dict = MappingIssueExportService.compile_validated_tasks_by_user(project_id, zeros)
 
-        data_table, category_index_dict, category_names_dict, max_category_index, totals = MappingIssueExporter.build_issue_totals_table(user_dict, project_users)
+        data_table, category_index_dict, category_names_dict, max_category_index, totals = MappingIssueExportService.build_issue_totals_table(user_dict, project_users)
+
+        self.totals = totals                            #for testing
+        self.category_names_dict = category_names_dict  #for testing
 
         """
         Format
@@ -104,7 +112,7 @@ class MappingIssueExportService:
             issue_names_row.append('Username (tasks mapped)')
 
         for i in range(1, max_category_index + 1):
-            issue_names_row.append(MappingIssueExporter.format_field(category_names_dict[i]))
+            issue_names_row.append(MappingIssueExportService.format_field(category_names_dict[i]))
 
         all_rows.append(','.join(issue_names_row))
 
@@ -132,6 +140,7 @@ class MappingIssueExportService:
                         single_task_row.append(str(issue_count))
                     single_task_row.pop(2)
                     all_rows.append(",".join(single_task_row))
+                    self.single_task_rows[task] = single_task_row  #for testing
 
                     i += 1
 
@@ -146,6 +155,7 @@ class MappingIssueExportService:
             for issue_count in data_table[user]:
                 row.append(str(issue_count))
             row.pop(1)
+            self.user_issue_totals[user] = deepcopy(row)  #for testing
 
             if (detailed):
                 row[1] = ''
@@ -180,11 +190,12 @@ class MappingIssueExportService:
         """
         all_project_tasks = Task.get_all_tasks(project_id)
         validated_tasks = []
-        project_users = set()
+        project_users = []
         for task in all_project_tasks:
             if (task.task_status == TaskStatus.VALIDATED.value):
                 validated_tasks.append(task)
-                project_users.add(task.mapper.username)
+                if task.mapper.username not in project_users:
+                    project_users.append(task.mapper.username)
             else:
                 continue
 
