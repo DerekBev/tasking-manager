@@ -333,6 +333,7 @@ class TestMappingIssueExportService(unittest.TestCase):
         self.mock_proj_contrib_dto.user_contributions.append(user_contrib_0)
         self.mock_proj_contrib_dto.user_contributions.append(user_contrib_1)
 
+    @classmethod
     def tearDownClass(self):
         self.ctx.pop()
 
